@@ -4,182 +4,184 @@ import json
 import base64
 import pandas as pd
 import plotly.express as px
-from dotenv import load_dotenv
-from groq import Groq
+from PIL import Image
+from food_classify import get_food_classification, get_nutrition_data, encode_image
 
-# Load environment variables
-load_dotenv()
-
-# Initialize the Groq client with the API key
-Groq_API = os.getenv("GROQ_API_KEY")
-client = Groq(api_key=Groq_API)
-
-# Function to encode the image to base64
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
-
-# Function to get food classification
-def get_food_classification(base64_image):
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": '''Identify the food item in the image. If it's a burger, tell me what kind of burger it is, like a cheeseburger or veggie burger. Just return the name of the food. Provide no extra descriptions or information.'''},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_image}",
-                        },
-                    },
-                ],
-            }
-        ],
-        model="llama-3.2-11b-vision-preview",
-    )
-    return chat_completion.choices[0].message.content
-
-# Function to get nutrition and eco-impact data
-def get_nutrition_data(food_name):
-    completion = client.chat.completions.create(
-        model="gemma2-9b-it",
-        messages=[
-            {
-                "role": "system",
-                "content": '''I want you to return something to me in the exact JSON body format that I request. 
-Your response should comprise only the JSON body I request and nothing other than it. 
-DO NOT include the triple tricks to make it a code block. I want it to simply be a string in JSON format 
-which I can do json.loads() on. 
-
-Make sure there are no extra spaces. MAKE SURE THERE ARE NO SPECIAL CHARACTERS, 
-ESPECIALLY ($, [, ], /, .). 
-
-Pretend you are a nutrition scientist and environmental scientist working together. 
-When labeling items as either healthy or unhealthy, make sure to be reasonable in your classifications. 
-Things that fall into the categories of fruits, vegetables, lean meats, and other food that is traditionally 
-seen as good for a human should be labeled as healthy.
-
-For environmental impact classifications, take into account water usage, carbon emissions, and whether the 
-food is locally sourced or seasonal. Suggest unique and practical ways to reduce food waste and carbon emissions.
-
-Include actionable **sustainability tips** that relate to this food item, such as how to minimize waste, 
-make eco-friendly choices, or its role in a sustainable diet. Make these tips practical, localized, and creative. 
-
-Here is the format below, and I will provide descriptions of each individual attribute in the JSON body:
-{
-    "food_name": string, // the name of the food
-    "calories_lower": int, // lower bound for calorie estimation range
-    "calories_upper": int, // upper bound for calorie estimation range
-    "carbon_emissions": int, // grams of CO₂ emissions for the food's production
-    "gallons_per_item_produced": int, // gallons of water needed to produce the food
-    "grams_of_protein": int,
-    "grams_of_carbs": int,
-    "grams_of_fats": int,
-    "calories_from_protein": int,
-    "calories_from_carbs": int,
-    "calories_from_fats": int,
-    "healthy": boolean, // True if healthy, False otherwise
-    "environmentally_friendly": boolean, // True if eco-friendly, False otherwise
-    "sustainability_tips": [string], // A list of actionable sustainability tips related to this food
-    "healthier_alternatives": { 
-        "alternative_1": string, // Suggest a healthier alternative
-        "alternative_2": string  // Suggest another alternative
-    }
-}
-'''
-            },
-            {
-                "role": "user",
-                "content": f"Please classify the food item: {food_name}"
-            }
-        ],
-        temperature=1,
-        max_tokens=1024,
-        top_p=1,
-        stream=False,
-        stop=None,
-    )
-    return json.loads(completion.choices[0].message.content)
-
-# Streamlit app
-st.title("Food Classification and Sustainability Insights")
-
-# uploaded_file = st.file_uploader("Upload an image of a food item", type=["jpg", "jpeg", "png"])
-
-# Toggle for input method
-input_method = st.radio(
-    "Select an input method:",
-    ("Upload an image", "Take a photo"),
-    index=0
+# Page Configuration
+st.set_page_config(
+    page_title="GreenFork: Youth Sustainability Platform",
+    page_icon="🌱",
+    layout="wide"
 )
 
-image_path = None
+# Session State for Tracking Impact
+if 'total_carbon_saved' not in st.session_state:
+    st.session_state.total_carbon_saved = 0
+if 'total_water_saved' not in st.session_state:
+    st.session_state.total_water_saved = 0
+if 'analyzed_foods' not in st.session_state:
+    st.session_state.analyzed_foods = []
 
-if input_method == "Upload an image":
-    uploaded_file = st.file_uploader("Upload an image of a food item", type=["jpg", "jpeg", "png"])
-    if uploaded_file is not None:
-        temp_path = "temp_image.jpg"
-        with open(temp_path, "wb") as f:
-            f.write(uploaded_file.read())
-        image_path = temp_path
+# Sidebar for Youth Engagement
+def sidebar_youth_impact():
+    st.sidebar.title("🌍 Your Sustainability Journey")
+    
+    # Impact Tracker
+    st.sidebar.header("♻️ Impact Metrics")
+    st.sidebar.metric("Carbon Saved", 
+                      f"{st.session_state.total_carbon_saved:.2f} g CO₂")
+    st.sidebar.metric("Water Conserved", 
+                      f"{st.session_state.total_water_saved:.2f} liters")
+    
+    # Educational Resources
+    st.sidebar.header("Learn More")
+    sdg_resources = {
+        "Climate Action": "https://sdgs.un.org/goals/goal13",
+        "Responsible Consumption": "https://sdgs.un.org/goals/goal12",
+        "Zero Hunger": "https://sdgs.un.org/goals/goal2"
+    }
+    
+    for goal, link in sdg_resources.items():
+        st.sidebar.markdown(f"[🔗 {goal}]({link})")
 
-elif input_method == "Take a photo":
-    camera_input = st.camera_input("Capture an image of a food item")
-    if camera_input is not None:
-        image_path = "captured_image.jpg"
-        with open(image_path, "wb") as f:
-            f.write(camera_input.getvalue())
+# Main App
+def main():
+    st.title("🍽️ GreenFork")
+    
+    # Youth-Focused Introduction
+    st.markdown("""
+    ### Empowering Youth Through Sustainable Food Choices 🌱
 
-if image_path:
-    base64_image = encode_image(image_path)
+    **Did you know?** Your food choices can make a big difference for the planet! 
+    GreenFork helps you understand the environmental impact of what you eat.
+    """)
 
-    try:
-        # Identify the food item
-        food_name = get_food_classification(base64_image)
+    # Toggle for input method
+    input_method = st.radio(
+        "Choose how you want to input the food image:",
+        ("📁 Upload an Image", "📸 Take a Photo"),
+        index=0
+    )
 
-        # Get nutrition and eco-impact data
-        food_data = get_nutrition_data(food_name)
+    # Initialize variables
+    image_path = None
+    image_display = None
 
-        # Display food name
-        st.header(f"Food Item: {food_name}")
+    # Handle image input based on user choice
+    if input_method == "📁 Upload an Image":
+        uploaded_file = st.file_uploader("Upload an image of a food item", type=["jpg", "jpeg", "png"])
+        if uploaded_file is not None:
+            temp_path = "temp_image.jpg"
+            with open(temp_path, "wb") as f:
+                f.write(uploaded_file.read())
+            image_path = temp_path
+            image_display = temp_path
 
-        # Display nutrient breakdown
-        nutrients = pd.DataFrame([
-            {"Nutrient": "Protein", "Amount": food_data['grams_of_protein']},
-            {"Nutrient": "Carbs", "Amount": food_data['grams_of_carbs']},
-            {"Nutrient": "Fats", "Amount": food_data['grams_of_fats']},
-        ])
-        fig_nutrients = px.bar(nutrients, x="Nutrient", y="Amount", title="Nutrient Breakdown (g)",
-                               color="Nutrient", text="Amount")
-        st.plotly_chart(fig_nutrients)
+    elif input_method == "📸 Take a Photo":
+        camera_input = st.camera_input("Capture an image of a food item")
+        if camera_input is not None:
+            image_path = "captured_image.jpg"
+            with open(image_path, "wb") as f:
+                f.write(camera_input.getvalue())
+            image_display = image_path
 
-        # Display calorie distribution
-        calorie_sources = pd.DataFrame([
-            {"Source": "Protein", "Calories": food_data['calories_from_protein']},
-            {"Source": "Carbs", "Calories": food_data['calories_from_carbs']},
-            {"Source": "Fats", "Calories": food_data['calories_from_fats']},
-        ])
-        fig_calories = px.pie(calorie_sources, values="Calories", names="Source",
-                              title="Calorie Distribution")
-        st.plotly_chart(fig_calories)
+    # Process and display results if an image is provided
+    if image_path:
+        base64_image = encode_image(image_path)
 
-        # Display environmental impact
-        st.subheader("Environmental Impact")
-        st.write(f"Carbon Emissions: {food_data['carbon_emissions']} g CO2")
-        st.write(f"Water Usage: {food_data['gallons_per_item_produced']} gallons")
-        st.write(f"Eco-Friendly: {'Yes' if food_data['environmentally_friendly'] else 'No'}")
-        st.write(f"Healthy: {'Yes' if food_data['healthy'] else 'No'}")
+        try:
+            # Identify the food item
+            food_name = get_food_classification(base64_image)
+            food_data = get_nutrition_data(food_name)
 
-        # Display sustainability tips
-        st.subheader("Sustainability Tips")
-        for tip in food_data.get('sustainability_tips', []):
-            st.write(f"- {tip}")
+            # Ensure food_data is a dictionary
+            if isinstance(food_data, str):
+                try:
+                    food_data = json.loads(food_data)
+                except json.JSONDecodeError:
+                    st.error("⚠️ Failed to parse nutrition data. Please try again.")
+                    food_data = {}
 
-        # Display healthier alternatives
-        st.subheader("Healthier Alternatives")
-        for key, alt in food_data.get("healthier_alternatives", {}).items():
-            st.write(f"- {alt}")
+            # Check if valid data is returned
+            if not food_data or not food_name:
+                st.warning("⚠️ Could not identify the food item. Please try another image.")
+            else:
+    # Extract impact metrics
+                carbon_impact = food_data['environmental_impact']['carbon_footprint_gCO2']
+                water_impact = food_data['environmental_impact']['water_usage_liters']
 
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+                # Update session state for metrics
+                st.session_state.total_carbon_saved += carbon_impact
+                st.session_state.total_water_saved += water_impact
+                st.session_state.analyzed_foods.append(food_name)
+                col1, col2 = st.columns([1, 2])
+
+                # Left Column: Display the Image and Food Title
+                with col1:
+                    st.image(image_display, caption="Uploaded Food Image", use_container_width=True)
+
+                # Right Column: Display Food Name and Environmental Impact
+                with col2:
+                    st.markdown("### ")
+                    st.write(f"**{food_name}**")
+                st.markdown("---")
+
+                # Youth Education Section
+                st.markdown("### 🌍 Your Sustainability Impact")
+                col3, col4 = st.columns(2)
+                with col3:
+                # Environmental Impact Visualization
+                    impact_df = pd.DataFrame([
+                        {"Metric": "Carbon Footprint", "Value": carbon_impact, "Unit": "g CO₂"},
+                        {"Metric": "Water Usage", "Value": water_impact, "Unit": "liters"}
+                    ])
+                    
+                    fig_impact = px.bar(
+                        impact_df, x="Metric", y="Value", 
+                        text=[f"{val} {unit}" for val, unit in zip(impact_df['Value'], impact_df['Unit'])],
+                        title="Environmental Impact of Your Food",
+                        color="Metric",
+                        color_discrete_sequence=["#A1EEBD", "#C6E7FF"]
+                    )
+                    st.plotly_chart(fig_impact, use_container_width=True)
+
+                with col4:
+            # Nutrient Breakdown
+                    if 'nutrition' in food_data and all(k in food_data['nutrition'] for k in ['protein_g', 'carbs_g', 'fats_g']):
+    # Create DataFrame for nutrients
+                        nutrients = pd.DataFrame([
+                            {"Nutrient": "Protein", "Amount": food_data['nutrition']['protein_g'], "Unit": "g"},
+                            {"Nutrient": "Carbs", "Amount": food_data['nutrition']['carbs_g'], "Unit": "g"},
+                            {"Nutrient": "Fats", "Amount": food_data['nutrition']['fats_g'], "Unit": "g"},
+                        ])
+                        
+                        # Display Nutrient Bar Plot
+                        fig_nutrients = px.bar(
+                            nutrients, 
+                            x="Nutrient", 
+                            y="Amount",
+                            text=[f"{amt} {unit}" for amt, unit in zip(nutrients['Amount'], nutrients['Unit'])],  # Fixed text
+                            title="Nutrient Breakdown (g)", 
+                            color="Nutrient",
+                            color_discrete_sequence=["#A1EEBD", "#C6E7FF", "#73BBA3"]
+                        )
+                        st.plotly_chart(fig_nutrients, use_container_width=True)
+
+
+                # Sustainability Insights
+                st.subheader("Sustainability Insights 🌱")
+                sustainability_data = food_data.get("sustainability", {})
+                if sustainability_data:
+                    st.write(f"- **Seasonality:** {sustainability_data.get('seasonality', 'N/A')}")
+                    st.write(f"- **Local vs Imported:** {sustainability_data.get('local_vs_imported', 'N/A')}")
+                    st.write(f"- **Food Waste Risk:** {sustainability_data.get('food_waste_risk', 'N/A')}")
+
+                # Interactive Quiz Button
+                
+        except Exception as e:
+            st.error(f"An error occurred while processing the image: {e}")
+
+# Run the main app
+if __name__ == "__main__":
+    sidebar_youth_impact()
+    main()
