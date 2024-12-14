@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import json
 import base64
+import cv2
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
@@ -105,17 +106,37 @@ Here is the format below, and I will provide descriptions of each individual att
 # Streamlit app
 st.title("Food Classification and Sustainability Insights")
 
-uploaded_file = st.file_uploader("Upload an image of a food item", type=["jpg", "jpeg", "png"])
+# uploaded_file = st.file_uploader("Upload an image of a food item", type=["jpg", "jpeg", "png"])
 
-if uploaded_file is not None:
-    temp_path = "temp_image.jpg"
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_file.read())
+# Toggle for input method
+input_method = st.radio(
+    "Select an input method:",
+    ("Upload an image", "Take a photo"),
+    index=0
+)
 
-    base64_image = encode_image(temp_path)
+image_path = None
+
+if input_method == "Upload an image":
+    uploaded_file = st.file_uploader("Upload an image of a food item", type=["jpg", "jpeg", "png"])
+    if uploaded_file is not None:
+        temp_path = "temp_image.jpg"
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.read())
+        image_path = temp_path
+
+elif input_method == "Take a photo":
+    camera_input = st.camera_input("Capture an image of a food item")
+    if camera_input is not None:
+        image_path = "captured_image.jpg"
+        with open(image_path, "wb") as f:
+            f.write(camera_input.getvalue())
+
+if image_path:
+    base64_image = encode_image(image_path)
 
     try:
-        # Identify the food
+        # Identify the food item
         food_name = get_food_classification(base64_image)
 
         # Get nutrition and eco-impact data
