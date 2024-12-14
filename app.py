@@ -2,7 +2,6 @@ import streamlit as st
 import os
 import json
 import base64
-import cv2
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
