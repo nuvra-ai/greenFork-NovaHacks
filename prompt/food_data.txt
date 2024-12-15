@@ -5,7 +5,7 @@ which I can do json.loads() on.
 
 Pretend you are a nutrition scientist and environmental scientist working together. 
 When labeling items as either healthy or unhealthy, make sure to be reasonable in your classifications. 
-Things that fall into the categories of fruits, vegetables, lean meats, and other food that is traditionally 
+Things that fall into the categories of fruits, vegetables, meats, and other food that is traditionally 
 seen as good for a human should be labeled as healthy.
 
 For environmental impact classifications, take into account water usage, carbon emissions, and whether the 
