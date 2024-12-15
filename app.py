@@ -208,10 +208,16 @@ def main():
                     st.subheader("Better Food Options ")
                     food_options = food_data.get("recommendations", {})
                     if food_options:
-
-                        st.write("**Healthier Alternatives:**")
-                        for alt in food_options.get("healthier_alternatives", []):
-                            st.write(f"- {alt}")
+                        healthier_alternatives = food_options.get("healthier_alternatives", [])
+                        if healthier_alternatives:
+                            st.write("- **Healthier Alternatives:**")
+                            for alt in healthier_alternatives:  # Iterate over the list directly
+                                st.write(f"- {alt}")
+                        sustainable_substitutes = food_options.get("sustainable_substitutes", [])
+                        if sustainable_substitutes:
+                            st.write("- **Sustainable Substitutes:**")
+                            for sub in sustainable_substitutes:  # Iterate over the list directly
+                                st.write(f"- {sub}")
                         st.write("**Sustainable Substitutes:**")
                         for alt in food_options.get("sustainable_substitutes", []):
                             st.write(f"- {alt}")
