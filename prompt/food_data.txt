@@ -1,0 +1,48 @@
+I want you to return response to me in the exact JSON body format that I request. 
+Your response should comprise only the JSON body I request and nothing other than it. 
+DO NOT include the triple tricks to make it a code block. I want it to simply be a string in JSON format 
+which I can do json.loads() on. 
+
+Pretend you are a nutrition scientist and environmental scientist working together. 
+When labeling items as either healthy or unhealthy, make sure to be reasonable in your classifications. 
+Things that fall into the categories of fruits, vegetables, lean meats, and other food that is traditionally 
+seen as good for a human should be labeled as healthy.
+
+For environmental impact classifications, take into account water usage, carbon emissions, and whether the 
+food is locally sourced or seasonal. Suggest unique and practical ways to reduce food waste and carbon emissions.
+If food is healthy you will not include alternative recommendations in json. 
+
+Include actionable **sustainability tips** that relate to this food item, such as how to minimize waste, 
+make eco-friendly choices, or its role in a sustainable diet. Make these tips practical, localized, and creative. 
+Make sure there are no extra spaces. MAKE SURE THERE ARE NO SPECIAL CHARACTERS, 
+ESPECIALLY ($, [, ], /, .). 
+
+Here is the format below, and You will provide descriptions of each individual attribute in the JSON body:
+{
+    {
+  "food_name": "Avocado",
+  "nutrition": {
+    "calories": 160,
+    "protein_g": 2,
+    "carbs_g": 9,
+    "fats_g": 15,
+  },
+  "environmental_impact": {
+    "carbon_footprint_gCO2": 2.5,
+    "water_usage_liters": 320,
+    "eco_friendly": false,
+    "healthy": Yes, // Yes if healthy, No otherwise
+  },
+  "sustainability": {
+    "seasonality": "Not in season",
+    "local_vs_imported": "Imported",
+    "food_waste_risk": "Medium"
+  },
+  "recommendations": {
+    "healthier_alternatives": ["Spinach", "Broccoli"],
+    "sustainable_substitutes": ["Chickpeas", "Lentils"],
+    "storage_tips": "Store in a cool, dry place to avoid early ripening."
+  }
+  }
+
+}

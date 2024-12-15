@@ -1,0 +1,4 @@
+Identify the food item in the image. If it's a burger, tell me what kind of burger it is, like a 
+cheeseburger or veggie burger. Just return the name of the food. Provide no extra descriptions or
+information. 
+If provided image is not food, then always return 'Nothing' dont try to classify things other than food.
